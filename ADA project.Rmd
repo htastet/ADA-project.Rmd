@@ -1,0 +1,175 @@
+---
+title: "ADA project"
+author: "Heidi Tastet"
+date: "11/9/2020
+output: html_document
+---
+
+```{r setup, include=FALSE}
+#load packages
+pacman::p_load(readr, tidyverse, nnet, MASS, funModeling, brant, RCurl)
+```
+
+
+```{r setup, include=FALSE}
+#download The Counter-Trafficking Data Collaborative file
+fileUrl <- "https://www.ctdatacollaborative.org/sites/default/files/The%20Global%20Dataset%2014%20Apr%202020.csv?accessType=DOWNLOAD"
+download.file(fileUrl, destfile = "./test.csv", method = "curl") 
+dateDownloaded <- data()
+
+#read the data downloaded
+data <- read.table("./test.csv", sep = ",", header = TRUE)
+
+#taking a quick look 
+describe(data)
+```
+
+
+```{r setup, include=FALSE}
+#recode gender as factor
+data$gender<-as.factor(data$gender)
+str(data)
+```
+
+
+```{r setup, include=FALSE}
+#keep age as character, drop missing data
+data$ageBroad[data$ageBroad == -99] <- NA
+describe(data)
+
+table(data$gender,useNA = "always")
+```
+
+```{r}
+data$age_cat <- ifelse(data$ageBroad == "0--8"|
+                         data$ageBroad == "9--17", 0, 1)
+table(data$age_cat)
+```
+
+```{r}
+#create new categorical variable for means of control debt
+data$MOC1<-ifelse(data$meansOfControlDebtBondage==1|
+  data$meansOfControlExcessiveWorkingHours==1|
+  data$meansOfControlTakesEarnings==1, 1, 0)
+
+#logistic regression model with gender + age category
+mod1 <- glm(MOC1 ~ gender + age_cat, data=data, family=binomial)
+summary(mod1)
+
+#second logistic model with gender*age category interaction term, multivariate
+mod2 <- glm(MOC1 ~ gender + age_cat + gender * age_cat, data=data, family=binomial)
+summary(mod2)
+
+library(lmtest)
+
+#likelihood test to see if second model improves on first
+lrtest(mod1, mod2)
+#interpretation
+#The second model that adjusted for age was a better model than just gender alone, p value <0.5
+
+
+```
+```{r}
+#calculate and print ORs and 95% CIs Model 1
+ORmod1<-exp(cbind(OR = coef(mod1), confint(mod1))) #calculate ORs and 95% CIs
+ORmod1 #print ORs and 95% CIs
+
+#interpretation
+#The odds of financial means of control for those who are males is 2.5 times higher (or 150% higher) than the odds of financial means of control for those who are female
+```
+```{r}
+#calculate and print ORs and 95% CIs Model 2
+ORmod2<-exp(cbind(OR = coef(mod2), confint(mod2))) #calculate ORs and 95% CIs
+ORmod2 #print ORs and 95% CIs
+
+#interpretation
+#After adjusting for age, males are 4 times more likely to be influcenced by financial means of control than females
+```
+
+
+```{r}
+#logistic model testing whether age of males affects likelihood of financial means of control
+mod3 <- glm(MOC1 ~ gender, data=data[which(data$age_cat==0),], family=binomial)
+summary(mod3)
+
+mod4 <- glm(MOC1 ~ gender, data=data[which(data$age_cat==1),], family=binomial)
+summary(mod4)
+
+males<- data[which(data$gender=="Males"),]
+
+
+
+```
+```{r}
+ORmod3<-exp(cbind(OR = coef(mod3), confint(mod3))) #calculate ORs and 95% CIs
+ORmod3 #print ORs and 95% CIs
+```
+```{r}
+ORmod4<-exp(cbind(OR = coef(mod4), confint(mod4))) #calculate ORs and 95% CIs
+ORmod4 #print ORs and 95% CIs
+```
+
+
+```{r}
+
+pacman::p_load(survival, survminer, tidyverse, readr, lmtest, table1)
+
+
+  
+```
+
+
+```{r}
+#create table to show how gender is associated with means of control and the effect of age
+table1(~data$MOC1 + data$age_cat|data$gender, overall="Total", data)
+label(data$MOC1)<- "Means of Control"
+label(data$age_cat)<- "Age"
+
+#Those who are male have a higher means of control than females with a mean means of control of #0.114 (sd=0.318) vs 0.0574 (sd=0.233).
+
+```
+```{r}
+#Table 2 model 1 results
+table1(~MOC1 + age_cat|gender, overall="Total", data)
+table1(~age_cat + gender|MOC1, overall="Total", data)
+
+```
+```{r}
+#Table 3 model 2 results
+table1(~gender + age_cat + gender*age_cat|MOC1, overall="Total", data)
+```
+
+
+```{r}
+library(DiagrammeR)
+grViz
+testImplications <- function( covariance.matrix, sample.size ){
+	library(ggm)
+	tst <- function(i){ pcor.test( pcor(i,covariance.matrix), length(i)-2, sample.size )$pvalue }
+tos <- function(i){ paste(i,collapse=" ") }
+implications <- list(c("Age","Gender","MOC"))
+	data.frame( implication=unlist(lapply(implications,tos)),
+		pvalue=unlist( lapply( implications, tst ) ) )
+
+}
+```
+
+## R Markdown
+
+This is an R Markdown document. Markdown is a simple formatting syntax for authoring HTML, PDF, and MS Word documents. For more details on using R Markdown see <http://rmarkdown.rstudio.com>.
+
+When you click the **Knit** button a document will be generated that includes both content as well as the output of any embedded R code chunks within the document. You can embed an R code chunk like this:
+
+```{r cars}
+
+```
+
+## Including Plots
+
+You can also embed plots, for example:
+
+```{r pressure, echo=FALSE}
+plot(pressure)
+```
+
+Note that the `echo = FALSE` parameter was added to the code chunk to prevent printing of the R code that generated the plot.
